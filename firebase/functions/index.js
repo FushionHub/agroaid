@@ -2,6 +2,7 @@ const admin = require("firebase-admin");
 const functions = require("firebase-functions");
 const {PredictionServiceClient} = require("@google-cloud/aiplatform").v1;
 const {helpers} = require("@google-cloud/aiplatform");
+const axios = require("axios");
 
 admin.initializeApp();
 
@@ -104,6 +105,70 @@ exports.getUserProfile = functions.https.onCall(async (data, context) => {
     );
   }
 });
+
+exports.getGeoSpecificCropRecommendation = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError(
+        "unauthenticated",
+        "You must be logged in to get crop recommendations."
+      );
+    }
+
+    const { lat, lon } = data;
+
+    if (!lat || !lon) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Missing required fields: lat, lon"
+      );
+    }
+
+    const apiKey = functions.config().openweathermap.key;
+    const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`;
+
+    try {
+      const weatherResponse = await axios.get(weatherUrl);
+      const weatherData = weatherResponse.data;
+
+      const prompt = `
+        Given the following weather data for a location in Nigeria, recommend the best crops to plant:
+        - Temperature: ${weatherData.main.temp} Kelvin
+        - Humidity: ${weatherData.main.humidity}%
+        - Weather: ${weatherData.weather[0].description}
+        - Wind Speed: ${weatherData.wind.speed} m/s
+        Please provide a list of crops suitable for these conditions, along with a brief explanation for each.
+      `;
+
+      const endpoint = `projects/${process.env.GCLOUD_PROJECT}/locations/us-central1/publishers/google/models/gemini-1.0-pro-001`;
+
+      const instances = [helpers.toValue({ content: prompt })];
+      const parameters = helpers.toValue({
+        temperature: 0.2,
+        maxOutputTokens: 512,
+        topP: 0.95,
+        topK: 40,
+      });
+
+      const request = {
+        endpoint,
+        instances,
+        parameters,
+      };
+
+      const [response] = await predictionServiceClient.predict(request);
+      const prediction = response.predictions[0];
+      const text = prediction.stringValue;
+      return { text };
+    } catch (error) {
+      console.error("Error getting crop recommendation:", error);
+      throw new functions.https.HttpsError(
+        "internal",
+        "Error getting crop recommendation."
+      );
+    }
+  }
+);
 
 /**
  * Updates a user's profile in Firestore.
