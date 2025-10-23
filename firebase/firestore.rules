@@ -15,5 +15,8 @@ service cloud.firestore {
     match /chatHistory/{userId}/{messageId} {
       allow read, create: if request.auth != null && request.auth.uid == userId;
     }
+    match /wallets/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
