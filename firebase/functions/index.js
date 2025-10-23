@@ -124,6 +124,9 @@ exports.getGeoSpecificCropRecommendation = functions.https.onCall(
       );
     }
 
+    // IMPORTANT: Set the OpenWeatherMap API key in your Firebase project configuration.
+    // Run the following command in your terminal:
+    // firebase functions:config:set openweathermap.key="YOUR_API_KEY"
     const apiKey = functions.config().openweathermap.key;
     const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`;
 
@@ -385,6 +388,36 @@ exports.deleteProduct = functions.https.onCall(async (data, context) => {
 });
 
 // AI Advisory Functions
+
+/**
+ * Triggered by a file upload to Cloud Storage, this function simulates a pest/disease diagnosis.
+ */
+exports.diagnosePestOrDisease = functions.storage.object().onFinalize(async (object) => {
+  const { bucket, name, contentType } = object;
+
+  // For this prototype, we'll use mock logic.
+  // In a real implementation, this is where you would call the TensorFlow Lite model.
+  const isHealthy = Math.random() > 0.5;
+  const diagnosis = {
+    fileName: name,
+    filePath: `gs://${bucket}/${name}`,
+    contentType,
+    isHealthy,
+    diagnosis: isHealthy ? "Healthy" : "Signs of Leaf Scorch detected",
+    confidence: Math.random() * (0.95 - 0.7) + 0.7, // Mock confidence score
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  try {
+    await admin.firestore().collection("diagnoses").add(diagnosis);
+    console.log(`Diagnosis for ${name} saved to Firestore.`);
+  } catch (error) {
+    console.error("Error saving diagnosis to Firestore:", error);
+  }
+
+  return null;
+});
+
 exports.getAgroAdvice = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
