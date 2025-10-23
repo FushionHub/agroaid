@@ -12,5 +12,8 @@ service cloud.firestore {
     match /diagnoses/{diagnosisId} {
       allow read, create: if request.auth != null;
     }
+    match /chatHistory/{userId}/{messageId} {
+      allow read, create: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

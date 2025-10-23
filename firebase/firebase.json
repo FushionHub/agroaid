@@ -12,12 +12,7 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
-      {
-        "source": "**",
-        "function": "nextServer"
-      }
-    ]
+"// TODO: Re-enable rewrites once the Next.js web app is built and the 'nextServer' function is deployed."
   },
   "firestore": {
     "rules": "firestore.rules",
